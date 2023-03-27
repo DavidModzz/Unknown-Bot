@@ -1,0 +1,45 @@
+{
+  "name": "unknown-bot",
+  "version": "1.0.0",
+  "description": "Base to create whatsapp bot using the @adiwajshing/Baileys library",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DavidModzz/Unknown-Bot.git"
+  },
+  "keywords": [
+    "adiwajshing",
+    "baileys",
+    "whatsapp",
+    "bot",
+    "termux"
+  ],
+  "author": "DavidModzz",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/DavidModzz/Unknown-Bot/issues"
+  },
+  "homepage": "https://github.com/DavidModzz/Unknown-Bot#readme",
+  "dependencies": {
+    "@adiwajshing/baileys": "^4.4.0",
+    "axios": "^1.3.4",
+    "cfonts": "^3.1.1",
+    "chalk": "^4.1.2",
+    "child_process": "^1.0.2",
+    "form-data": "^4.0.0",
+    "fs": "^0.0.1-security",
+    "mime-types": "^2.1.35",
+    "moment-timezone": "^0.5.42",
+    "node-fetch": "^2.6.1",
+    "performance-now": "^2.1.0",
+    "pino": "^8.11.0",
+    "qrcode-terminal": "^0.12.0",
+    "uutil": "^0.0.12"
+  }
+}
