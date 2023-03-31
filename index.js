@@ -20,23 +20,18 @@ const { fetchJson } = require("./lib/fetcher");
 const { fromBuffer } = require("file-type");
 const { banner, banner2 } = require("./lib/functions");
 const { tmpdir } = require("os");
-
 const hour = moment.tz(timezone).format("HH:mm:ss");
 const date = moment.tz(timezone).format("DD/MM/YY");
-
 const telegraph = require("./lib/telegraph");
 const { isFiltered, addFilter } = require("./lib/spam");
-const antilink = JSON.parse(fs.readFileSync("./database/groups/antilink.json"));
+const girastamp = speed();
+const latensi = speed() - girastamp;
 
-let girastamp = speed();
-let latensi = speed() - girastamp;
-
-async function startUnknown () {
+async function start () {
   const store = makeInMemoryStore({ logger: P().child({ level: "debug", stream: "store" }) })
   
-  // 𝚀𝚁𝙲𝙾𝙳𝙴
   const { state, saveState } = useSingleFileAuthState("./session.json")
-  // limpar console
+  const clearState = () => unlink('./session.json')
   console.log(banner.string)
   console.log(banner2.string)
   const client = AnyWASocket({
@@ -48,42 +43,37 @@ async function startUnknown () {
 
   client.ev.on("creds.update", saveState);
 
-  store.bind(client.ev);
-  client.ev.on("chats.set", () => {
-    console.log("Tem conversas", store.chats.all());
-  });
-
-  client.ev.on("contacts.set", () => {
-    console.log("Tem contatos", Object.values(store.contacts));
-  });
-
-  client.ev.on("connection.update", (update) => {
-    const { connection, lastDisconnect } = update;
-    if (connection === "close") {
-      const shouldReconnect =
-        lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      console.log(
-        "Conexión cerrada debido a",
-        lastDisconnect.error,
-        "Reconectando...",
-        shouldReconnect
-      );
-
-      if (shouldReconnect) {
-        startUnknown();
-      }
-    } else if (connection === "open") {
-      console.log(
-        `${color(
-          `Conectado\nPrefix: ${prefix}\nDueño: ${ownerName}\n`,
-          "gold"
-        )}`
-      );
-      client.sendMessage(`${ownerNum}@s.whatsapp.net`, {
-        text: `*O Bot foi ligado\ndia ${date}\nas ${hour}\nBot: ${botName}\nPrefix: ${prefix}`,
-      });
-    }
-  });
+  client.ev.on('connection.update', async (update) => {
+        const { connection, lastDisconnect } = update
+        if (update.qr) {
+            console.log(
+                color('[', 'white'),
+                color('!', 'red'),
+                color(']', 'white'),
+                color(`Scan the QR code`, 'blue')
+            )
+        }
+        if (connection === 'close') {
+            const { statusCode } = new Boom(lastDisconnect?.error).output
+            if (statusCode !== DisconnectReason.loggedOut) {
+                console.log('Connecting...')
+                setTimeout(() => start(), 3000)
+            } else {
+                console.log('Disconnected.', true)
+                clearState()
+                console.log('Starting...')
+                setTimeout(() => start(), 3000)
+            }
+        }
+        if (connection === 'connecting') {
+            client.state = 'connecting'
+            console.log('Connecting to WhatsApp...')
+        }
+        if (connection === 'open') {
+            client.state = 'open'
+            console.log('🤖', color(`${botName} is ready!!`, 'green'))
+        }
+    })
 
   client.ev.on("messages.upsert", async (msg) => {
     m = msg;
@@ -203,34 +193,10 @@ async function startUnknown () {
       const enviar = (texto) => {
         client.sendMessage(from, { text: texto }, { quoted: info });
       };
-
-      // VERIFICADOS ⭐️
-      const live = {
-        key: { participant: "0@s.whatsapp.net" },
-        message: { liveLocationMessage: {} },
-      };
-      const img = {
-        key: { participant: "0@s.whatsapp.net" },
-        message: { imageMessage: {} },
-      };
-      const vid = {
-        key: { participant: "0@s.whatsapp.net" },
-        message: { videoMessage: {} },
-      };
-      const ctt = {
-        key: { participant: "0@s.whatsapp.net" },
-        message: { contactMessage: { displayName: `${pushname}` } },
-      };
-      const doc = {
-        key: { participant: "0@s.whatsapp.net" },
-        message: { documentMessage: {} },
-      };
-
       const quoted = info.quoted ? info.quoted : info;
       const mime = (quoted.info || quoted).mimetype || "";
       const isBot = info.key.fromMe ? true : false;
       const isBotGroupAdmins = groupAdmins.includes(botNum) || false;
-      const isAntiLink = isGroup ? antilink.includes(from) : false;
       const isGroupAdmins = groupAdmins.includes(sender) || false;
       const isOwner = sender.includes(ownerNum);
       const groupId = isGroup ? groupMetadata.jid : "";
@@ -278,98 +244,45 @@ async function startUnknown () {
 
       if (budy == `${prefix}`) {
         enviar("👍");
-      }
+      } 
 
-      // ANTILINK FUNCTION \\
-      if (budy.includes("https://")) {
-        if (!isGroup) return;
-        if (!isAntiLink) return;
-        if (isGroupAdmins)
-          return enviar(`*${pushname}* eres admin, no seras baneado`);
-        var Kick = `${sender.split("@")[0]}@s.whatsapp.net`;
-        settimeout(() => {
-          enviar(`*Eliminando do grupo!*`);
-        }, 100);
-        enviar(
-          `*_「 link  detectado 」_*\n*${pushname}* seras eliminado grupo *${groupMetadata.subject}*`
-        );
-        settimeout(() => {
-          client.groupParticipantsUpdate(from, [Kick], "remove").catch((e) => {
-            enviar(`*ERROR:* ${e}`);
-          });
-        }, 10);
-        settimeout(() => {}, 0);
-      }
-      if (budy.includes("wa.me")) {
-        if (!isGroup) return;
-        if (!isAntiLink) return;
-        if (isGroupAdmins)
-        return enviar(`*${pushname}* eres admin, no seras baneado`);
-        var Kick = `${sender.split("@")[0]}@s.whatsapp.net`;
-        settimeout(() => {
-          enviar(`*Eliminando del grupo!*`);
-        }, 100);
-        enviar(
-          `*_「 link  detectado 」_*\n*${pushname}* seras eliminado grupo *${groupMetadata.subject}*`
-        );
-        settimeout(() => {
-          client.groupParticipantsUpdate(from, [Kick], "remove").catch((e) => {
-            enviar(`*ERROR:* ${e}`);
-          });
-        }, 10);
-        settimeout(() => {}, 0);
-      }
-      if (budy.includes("http://")) {
-        if (!isGroup) return;
-        if (!isAntiLink) return;
-        if (isGroupAdmins)
-          return enviar(`*${pushname}* eres admin, no seras baneado`);
-        var Kick = `${sender.split("@")[0]}@s.whatsapp.net`;
-        settimeout(() => {
-          enviar(`*Eliminando del grupo!*`);
-        }, 100);
-        enviar(
-          `*_「 link  detectado 」_*\n*${pushname}* seras eliminado grupo *${groupMetadata.subject}*`
-        );
-        settimeout(() => {
-          client.groupParticipantsUpdate(from, [Kick], "remove").catch((e) => {
-            enviar(`*ERROR:* ${e}`);
-          });
-        }, 10);
-        settimeout(() => {}, 0);
-      }
-
-      ////////////////////////////////////
+//       message logging
       if (!isGroup && isCmd)
-        console.log(
-          "[\x1b[1;32m COMANDO \x1b[1;37m]",
-          color(comando, "violet"),
-          "USUARIO",
-          color(pushname, "violet")
-        );
-      if (!isGroup && !isCmd)
-        console.log(
-          "[\x1b[1;32m MENSAGEM \x1b[1;37m]",
-          "DO",
-          color(pushname, "violet")
-        );
-      if (isCmd && isGroup)
-        console.log(
-          "[\x1b[1;32m COMANDO \x1b[1;37m]",
-          color(comando, "violet"),
-          "do",
-          color(pushname, "violet"),
-          "NO GRUPO",
-          color(groupName)
-        );
-      if (!isCmd && isGroup)
-        console.log(
-          "[\x1b[1;32m MENSAGEM \x1b[1;37m]",
-          "DO",
-          color(pushname, "violet"),
-          "NO GRUPO",
-          color(groupName)
-        );
+            console.log(
+                color('~', 'yellow'),
+                color('EXEC', 'red'),
+                color(cmdName, 'yellow'),
+                'from',
+                color(sender.split('@')[0], 'yellow')
+            )
+        if (!isGroup && !isCmd)
+            console.log(
+                color('~', 'yellow'),
+                color('RECV', 'green'),
+                color('Message', 'yellow'),
+                'from',
+                color(sender.split('@')[0], 'yellow')
+            )
+        if (isCmd && isGroup)
+            console.log(
+                color('~', 'yellow'),
+                color('EXEC', 'red'),
+                color(cmdName, 'yellow'),
+                'from',
+                color(sender.split('@')[0], 'yellow'),
+                'in',
+                color(gcName, 'yellow')
+            )
+        if (!isCmd && isGroup)
+            console.log(
+                color('~', 'yellow'),
+                color('RECV', 'green'),
+                color('Message', 'yellow'),
+                'from',
+                color(sender.split('@')[0], 'yellow'),
+                'in',
+                color(gcName, 'yellow')
+            )
 
       switch (comando) {
         // comienzo de comandos con prefix
