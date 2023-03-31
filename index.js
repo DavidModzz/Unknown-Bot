@@ -8,6 +8,7 @@ const {
 } = require("@adiwajshing/baileys");
 const fs = require("fs");
 const P = require("pino");
+const { Boom } = require("@hapi/boom");
 const axios = require("axios");
 const util = require("util");
 const fetch = require("node-fetch");
@@ -19,7 +20,6 @@ const { color } = require("./lib/color");
 const { fetchJson } = require("./lib/fetcher");
 const { fromBuffer } = require("file-type");
 const { banner, banner2 } = require("./lib/functions");
-const { tmpdir } = require("os");
 const hour = moment.tz(timezone).format("HH:mm:ss");
 const date = moment.tz(timezone).format("DD/MM/YY");
 const telegraph = require("./lib/telegraph");
@@ -27,53 +27,55 @@ const { isFiltered, addFilter } = require("./lib/spam");
 const girastamp = speed();
 const latensi = speed() - girastamp;
 
-async function start () {
-  const store = makeInMemoryStore({ logger: P().child({ level: "debug", stream: "store" }) })
-  
-  const { state, saveState } = useSingleFileAuthState("./session.json")
-  const clearState = () => unlink('./session.json')
-  console.log(banner.string)
-  console.log(banner2.string)
+async function start() {
+  const store = makeInMemoryStore({
+    logger: P().child({ level: "debug", stream: "store" }),
+  });
+
+  const { state, saveState } = useSingleFileAuthState("./session.json");
+  const clearState = () => fs.unlink("./session.json");
+  console.log(banner.string);
+  console.log(banner2.string);
   const client = AnyWASocket({
-  logger: P({ level: "silent" }),
-  printQRInTerminal: true,
-  browser: [botName,'Firefox','4.0.0'],
-  auth: state
-  })
+    logger: P({ level: "fatal" }),
+    printQRInTerminal: true,
+    browser: [botName, "Firefox", "4.0.0"],
+    auth: state,
+  });
 
   client.ev.on("creds.update", saveState);
 
-  client.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect } = update
-        if (update.qr) {
-            console.log(
-                color('[', 'white'),
-                color('!', 'red'),
-                color(']', 'white'),
-                color(`Scan the QR code`, 'blue')
-            )
-        }
-        if (connection === 'close') {
-            const { statusCode } = new Boom(lastDisconnect?.error).output
-            if (statusCode !== DisconnectReason.loggedOut) {
-                console.log('Connecting...')
-                setTimeout(() => start(), 3000)
-            } else {
-                console.log('Disconnected.', true)
-                clearState()
-                console.log('Starting...')
-                setTimeout(() => start(), 3000)
-            }
-        }
-        if (connection === 'connecting') {
-            client.state = 'connecting'
-            console.log('Connecting to WhatsApp...')
-        }
-        if (connection === 'open') {
-            client.state = 'open'
-            console.log('🤖', color(`${botName} is ready!!`, 'green'))
-        }
-    })
+  client.ev.on("connection.update", async (update) => {
+    const { connection, lastDisconnect } = update;
+    if (update.qr) {
+      console.log(
+        color("[", "white"),
+        color("!", "red"),
+        color("]", "white"),
+        color(`Escanea el código QR`, "blue")
+      );
+    }
+    if (connection === "close") {
+      const { statusCode } = new Boom(lastDisconnect?.error).output;
+      if (statusCode !== DisconnectReason.loggedOut) {
+        console.log("Conectando...");
+        setTimeout(() => start(), 3000);
+      } else {
+        console.log("Disconnected.", true);
+        clearState();
+        console.log("Starting...");
+        setTimeout(() => start(), 3000);
+      }
+    }
+    if (connection === "connecting") {
+      client.state = "connecting";
+      console.log("Conectando a WhatsApp...");
+    }
+    if (connection === "open") {
+      client.state = "open";
+      console.log("🤖", color(`${botName} está listo!!`, "green"));
+    }
+  });
 
   client.ev.on("messages.upsert", async (msg) => {
     m = msg;
@@ -242,57 +244,68 @@ async function start () {
       const isQuotedProduct =
         type === "extendedTextMessage" && content.includes("productMessage");
 
-      if (budy == `${prefix}`) {
-        enviar("👍");
-      } 
-
-//       message logging
+      //       message logging
       if (!isGroup && isCmd)
-            console.log(
-                color('~', 'yellow'),
-                color('EXEC', 'red'),
-                color(cmdName, 'yellow'),
-                'from',
-                color(sender.split('@')[0], 'yellow')
-            )
-        if (!isGroup && !isCmd)
-            console.log(
-                color('~', 'yellow'),
-                color('RECV', 'green'),
-                color('Message', 'yellow'),
-                'from',
-                color(sender.split('@')[0], 'yellow')
-            )
-        if (isCmd && isGroup)
-            console.log(
-                color('~', 'yellow'),
-                color('EXEC', 'red'),
-                color(cmdName, 'yellow'),
-                'from',
-                color(sender.split('@')[0], 'yellow'),
-                'in',
-                color(gcName, 'yellow')
-            )
-        if (!isCmd && isGroup)
-            console.log(
-                color('~', 'yellow'),
-                color('RECV', 'green'),
-                color('Message', 'yellow'),
-                'from',
-                color(sender.split('@')[0], 'yellow'),
-                'in',
-                color(gcName, 'yellow')
-            )
+        console.log(
+          color("Comando:", "blue"),
+          `${comando}`,
+          "\n",
+          color("De:", "blue"),
+          `${sender.split("@")[0]}`,
+          "\n"
+        );
+      if (!isGroup && !isCmd)
+        console.log(
+          color("Mensaje", "blue"),
+          "\n",
+          color("De:", "blue"),
+          `${sender.split("@")[0]}`,
+          "\n"
+        );
+      if (isCmd && isGroup)
+        console.log(
+          color("Comando:", "blue"),
+          `${comando}`,
+          "\n",
+          color("De:", "blue"),
+          `${sender.split("@")[0]}`,
+          "\n",
+          color("En:", "blue"),
+          `${groupName}`,
+          "\n"
+        );
+      if (!isCmd && isGroup)
+        console.log(
+          color("Mensaje", "blue"),
+          color("De:", "blue"),
+          `${sender.split("@")[0]}`,
+          "\n",
+          color("En:", "blue"),
+          `${groupName}`,
+          "\n"
+        );
 
       switch (comando) {
         // comienzo de comandos con prefix
 
+        case "attp":
+          try {
+            attp = args.join(" ");
+            url = encodeURI(`https://kurupi.onrender.com/attp?texto=${attp}`);
+            attp = await getBuffer(url);
+            client.sendMessage(from, { sticker: attp }, { quoted: info });
+          } catch (e) {
+            enviar("Error");
+            console.log(e);
+          }
+          break;
+
         // fin de comandos con prefix
-      default:
-        // comienzo de comandos sin prefix
+        default:
+          // comienzo de comandos sin prefix
 
           if (isCmd) {
-            enviar('*Este comando no existe*')
+            enviar("*Este comando no existe*");
           }
 
         // fin de comandos sin prefix
@@ -303,11 +316,3 @@ async function start () {
   });
 }
 start();
-
-let file = require.resolve(__filename);
-fs.watchFile(file, () => {
-  fs.unwatchFile(file);
-  console.log(`${color(`Atualizando: ${__filename}`, "cyan")}`);
-  delete require.cache[file];
-  require(file);
-});
