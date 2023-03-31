@@ -302,7 +302,7 @@ async function start () {
     }
   });
 }
-startUnknown();
+start();
 
 let file = require.resolve(__filename);
 fs.watchFile(file, () => {
